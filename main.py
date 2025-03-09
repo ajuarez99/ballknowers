@@ -9,7 +9,7 @@ DRAFT_ID = "1141438341108498432"
 league_members = [
     "popsharky",
     "njerickson",
-    "CheddaBob",
+    "ChedddaBob",
     "BamAddABio",
     "jstrobe",
     "theadambomb98",

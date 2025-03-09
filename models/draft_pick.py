@@ -65,6 +65,3 @@ draft_data = {
 
 # Create an instance of the class
 draft_pick = DraftPick(**draft_data)
-
-# Print the draft pick
-print(draft_pick)
