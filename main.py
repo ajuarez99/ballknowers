@@ -1,6 +1,8 @@
 import requests
 from models.league_member import LeagueMember  # Import the class
 from models.draft_pick import DraftPick
+from models.user_draft_pick import UserDraftPick
+from models.roster import Roster
 
 # Constants
 LEAGUE_ID = "1141438340626231296"
@@ -16,12 +18,12 @@ league_members = [
     "jpelwell",
     "ImReallyHarry",
     "shajav",
+    "bshewmon",
     "ChristianMaChilles",
-    "GraftonCarlson",
-    "bshewmon"
+    "GraftonCarlson"
 ]
 
-def fetch_league_members(members):
+def fetch_league_members(members, rosters):
     """Fetches user data for each league member and returns a dictionary."""
     members_data = {}
 
@@ -34,7 +36,31 @@ def fetch_league_members(members):
         else:
             print(f"❌ Failed to fetch data for {member}, Status Code: {response.status_code}")
 
-    return members_data
+    
+    return enrich_member_data(members_data, rosters)
+
+def enrich_member_data(members_data, rosters):
+    enriched_members = {}
+
+    for member, data in members_data.items():
+        user_id = data["user_id"]
+        roster_id = None  
+
+        for roster in rosters:
+            if roster.owner_id == user_id:
+                roster_id = roster.roster_id
+                break
+
+        enriched_members[member] = LeagueMember(
+            user_id = user_id,
+            username = member,
+            display_name = data.get("display_name", ""),
+            avatar = data.get("avatar", ""),
+            is_bot = data.get("is_bot", ""),
+            roster_id = roster_id
+        )
+
+    return enriched_members
 
 def fetch_draft_picks(draft_id):
     """Fetches draft picks and returns a dictionary of DraftPick objects."""
@@ -52,7 +78,8 @@ def fetch_draft_picks(draft_id):
 def match_users_to_draft_picks(league_members_data, draft_picks_dict):
     """Matches draft picks to league members using user IDs."""
     # Create a lookup dictionary {user_id: username}
-    user_id_to_username = {data["user_id"]: username for username, data in league_members_data.items()}
+    user_id_to_username = {data.user_id: username for username, data in league_members_data.items()}
+    user_draft_picks = []
 
     # Print draft picks with associated usernames
     print("\n📋 Draft Picks with Users:")
@@ -60,20 +87,61 @@ def match_users_to_draft_picks(league_members_data, draft_picks_dict):
         user_id = draft_pick.picked_by  # Get the user ID who made the pick
         username = user_id_to_username.get(user_id, "Unknown User")  # Find the username or default to "Unknown"
         print(f"Pick {pick_no}: {username} selected {draft_pick.metadata.first_name} {draft_pick.metadata.last_name}")
+        user_draft_picks.append(UserDraftPick(pick_no, username, draft_pick))
+    
+    return user_draft_picks
+
+def fetch_matchups(league_id):
+    url = f"https://api.sleeper.app/v1/league/{league_id}/matchups/1"
+    response = requests.get(url)
+
+    if response.status_code == 200:
+        matchupdata = response.json()
+        print(matchupdata)
+
+def fetch_rosters(league_id):
+    url = f"https://api.sleeper.app/v1/league/{league_id}/rosters"
+    response = requests.get(url)
+
+    if response.status_code == 200:
+        roster_data = response.json()
+        return [
+            Roster(
+                roster_id=roster["roster_id"],
+                owner_id=roster["owner_id"],
+                league_id=roster["league_id"],
+                metadata=roster.get("metadata", {}),
+                players=roster.get("players", []),
+                starters=roster.get("starters", []),
+                reserve=roster.get("reserve", []),
+                settings=roster.get("settings", {})
+            )
+            for roster in roster_data
+        ]
+    else:
+        print(f"Failed to fetch rosters. Status Code: {response.status_code}")
+        return []
+    
 
 def main():
     """Main function that runs the script."""
-    league_members_data = fetch_league_members(league_members)
+
+    rosters = fetch_rosters(LEAGUE_ID)
+    league_members_data = fetch_league_members(league_members, rosters)
     draft_picks_dict = fetch_draft_picks(DRAFT_ID)
+    user_draft_picks = match_users_to_draft_picks(league_members_data, draft_picks_dict)
+    ## fetch_matchups(LEAGUE_ID)
+    print_league_members(league_members_data)
 
-    # Print league members
-    print("\n🏀 League Members:")
-    for member, data in league_members_data.items():
-        print(f"{member} - User ID: {data['user_id']}")
 
-    # Print draft picks with user info
-    match_users_to_draft_picks(league_members_data, draft_picks_dict)
-
+def print_league_members(members_data):
+    """Prints all league members with their enriched data."""
+    for username, member in members_data.items():
+        print(f"Username: {username}")
+        print(f"User ID: {member.user_id}")
+        print(f"Display Name: {member.display_name}")
+        print(f"Roster ID: {member.roster_id}")  # Ensure roster_id was added
+        print("-" * 40)
 # Run the script only if executed directly
 if __name__ == "__main__":
     main()
