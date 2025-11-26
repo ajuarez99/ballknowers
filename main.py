@@ -3,6 +3,7 @@ from models.league_member import LeagueMember  # Import the class
 from models.draft_pick import DraftPick
 from models.user_draft_pick import UserDraftPick
 from models.roster import Roster
+from bs4 import BeautifulSoup
 
 # Constants
 LEAGUE_ID = "1141438340626231296"
@@ -122,6 +123,41 @@ def fetch_rosters(league_id):
         print(f"Failed to fetch rosters. Status Code: {response.status_code}")
         return []
     
+def web_scrape():
+    # URL of the webpage
+    url = "https://www.fantasypros.com/nba/adp/overall.php"
+
+    # Send a request to fetch the HTML content
+    headers = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36"
+    }
+    response = requests.get(url, headers=headers)
+
+    # Parse the HTML using BeautifulSoup
+    soup = BeautifulSoup(response.text, "html.parser")
+
+    # Find the table containing the ADP data
+    table = soup.find("table", {"id": "data"})  # Looking for table with the data
+
+    # Extract player names and ADP
+    players = []
+    adp_values = []
+
+    if table:
+        rows = table.find_all("tr")[1:]  # Skip header row
+
+        for row in rows:
+            cols = row.find_all("td")
+            if len(cols) >= 3:  # Ensure we have enough columns
+                player_name = cols[1].text.strip()
+                adp = cols[2].text.strip()
+                players.append(player_name)
+                adp_values.append(adp)
+
+    # Print results
+    for name, adp in zip(players, adp_values):
+        print(f"{name}: {adp}")
+
 
 def main():
     """Main function that runs the script."""
@@ -130,8 +166,9 @@ def main():
     league_members_data = fetch_league_members(league_members, rosters)
     draft_picks_dict = fetch_draft_picks(DRAFT_ID)
     user_draft_picks = match_users_to_draft_picks(league_members_data, draft_picks_dict)
-    ## fetch_matchups(LEAGUE_ID)
+    fetch_matchups(LEAGUE_ID)
     print_league_members(league_members_data)
+    web_scrape()
 
 
 def print_league_members(members_data):
@@ -145,3 +182,12 @@ def print_league_members(members_data):
 # Run the script only if executed directly
 if __name__ == "__main__":
     main()
+
+
+## jabari smith award - whoever had jabari smith the longest
+## the observatory award - top 3 the most times in a season
+## box of scraps award - lowest adr that was locked in
+## domestic disturbance award - most troubled players on fantasy roster at one point
+## joel embiid injury award - most out status on roster
+## ghost award - shaheen
+## least the locked amount
